@@ -1,5 +1,5 @@
 /node_modules/
-/subtitles/*.json
+*.Dub.json
 *-lock.json
 *.docx
 *.ass
