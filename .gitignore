@@ -1,0 +1,6 @@
+/node_modules/
+/subtitles/*.json
+*-lock.json
+*.docx
+*.ass
+*.srt
