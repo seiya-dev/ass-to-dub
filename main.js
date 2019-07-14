@@ -118,11 +118,11 @@ async function parseFile(){
                     parm = parm.split(',');
                     ptxt = parm.slice(9).join(',');
                     parm = parm.slice(0, 9);
-                    cprm = parm;
                     ctxt = ptxt.replace(/\{[^}]*\}/g, '');
                     parm.push(ptxt);
                 }
                 if(ass.events.format.length > 0 && type == 'Dialogue' && ptxt != ''){
+                    let cprm = parm.slice(0, 9);
                     let current = Object.assign(...ass.events.format.map((k, i) => ({[k]: parm[i]})));
                     current = Object.assign({CleanText: ctxt}, current);
                     let roleNames = current.Name.replace(/;;+/,';').replace(/^;+/,'').replace(/;+$/,'').split(';');
