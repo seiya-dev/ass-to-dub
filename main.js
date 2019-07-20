@@ -25,13 +25,13 @@ let file = '', lang = {}, roles = {};
     if(fs.existsSync(`./roles.json`)){
         roles = require(`./roles.json`);
     }
-    if(roles.toString != '[object Object]'){
+    if(roles.toString() != '[object Object]'){
         roles = {};
     }
-    if(!roles.male){
+    if(typeof roles.male != 'object' || roles.male === null || roles.male.toString() == '[object Object]'){
         roles.male = [];
     }
-    if(!roles.female){
+    if(typeof roles.female != 'object' || roles.female === null || roles.female.toString() == '[object Object]'){
         roles.female = [];
     }
     require('process').chdir(`${__dirname}/subtitles/`);
