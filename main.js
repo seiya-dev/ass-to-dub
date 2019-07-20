@@ -23,7 +23,7 @@ let file = '', lang = {}, roles = {};
         process.exit();
     }
     if(fs.existsSync(`./roles.json`)){
-        roles = JSON.parse(`./roles.json`);
+        roles = require(`./roles.json`);
     }
     if(roles.toString != '[object Object]'){
         roles = {};
