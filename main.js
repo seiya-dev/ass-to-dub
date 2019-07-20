@@ -205,7 +205,6 @@ async function parseFile(){
         txtRole = [].concat(
             [`${lang.male}`],[''],sroles.male,[''],
             [`${lang.female}`],[''],sroles.female,[''],
-            [`${lang.unsorted}`],[''],sroles.unsorted,[''],
         );
         if(sroles.unsorted.length>0){
             txtRole = txtRole.concat(
