@@ -6,11 +6,35 @@ const fs = require('fs');
 
 // plugins
 const { Document, Packer, Table, Paragraph, TextRun, } = require('docx');
-let file = '';
+let file = '', lang = {}, roles = {};
 
 // main
 (async function(){
-    require('process').chdir(`${__dirname}/subtitles/`)
+    console.log(`== Advanced SubStation Alpha to Dialogue List ==`);
+    console.log(`==             by  Seiya Loveless             ==`);
+    const langRegx = /^set_([a-z]{2})$/;
+    let setLangFile = filterByRegx(fs.readdirSync('./language/'),langRegx);
+    setLangFile = setLangFile.length > 0 ? setLangFile[0].match(langRegx)[1] : 'en';
+    if(fs.existsSync(`./language/${setLangFile}.json`)){
+        lang = require(`./language/${setLangFile}.json`);
+    }
+    else{
+        console.error(`[ERROR] Language file not found!`);
+        process.exit();
+    }
+    if(fs.existsSync(`./roles.json`)){
+        roles = JSON.parse(`./roles.json`);
+    }
+    if(roles.toString != '[object Object]'){
+        roles = {};
+    }
+    if(!roles.male){
+        roles.male = [];
+    }
+    if(!roles.female){
+        roles.female = [];
+    }
+    require('process').chdir(`${__dirname}/subtitles/`);
     let fls = filterByRegx(fs.readdirSync('.'),/(?<!\.Dub)\.ass$/);
     for(let f of fls){
         file = f;
@@ -125,7 +149,9 @@ async function parseFile(){
                     let cprm = parm.slice(0, 9);
                     let current = Object.assign(...ass.events.format.map((k, i) => ({[k]: parm[i]})));
                     current = Object.assign({CleanText: ctxt}, current);
-                    let roleNames = current.Name.replace(/;;+/,';').replace(/^;+/,'').replace(/;+$/,'').split(';');
+                    let roleNames = current.Name.replace(/\t/g,' ').replace(/  +/g,' ')
+                                        .replace(/;;+/g,';').replace(/^;+/g,'').replace(/;+$/g,'')
+                                        .split(';');
                     for(let r of roleNames){
                         let scurrent = current;
                         scurrent.Name = r.trim();
@@ -155,9 +181,41 @@ async function parseFile(){
         let srtFile = '';
         let docFile = new Document();
         let docRole = new Document();
+        let txtRole = '';
         let fileName = path.join(file.replace(/(\\|\/)+$/g,'').replace(/\.ass$/,''));
         // make role list
-        let rows = Object.keys(ass.roles).length+1;
+        let sroles = {
+            male:[],
+            female:[],
+            unsorted:[],
+        };
+        for(let r in Object.keys(ass.roles)){
+            r = parseInt(r);
+            let role = Object.keys(ass.roles)[r];
+            if(roles.male.includes(role)){
+                sroles.male.push(`${role}\t${ass.roles[role]}`);
+            }
+            else if(roles.female.includes(role)){
+                sroles.female.push(`${role}\t${ass.roles[role]}`);
+            }
+            else{
+                sroles.unsorted.push(`${role}\t${ass.roles[role]}`);
+            }
+        }
+        txtRole = [].concat(
+            [`${lang.male}`],[''],sroles.male,[''],
+            [`${lang.female}`],[''],sroles.female,[''],
+            [`${lang.unsorted}`],[''],sroles.unsorted,[''],
+        );
+        if(sroles.unsorted.length>0){
+            txtRole = txtRole.concat(
+                [`${lang.unsorted}`],[''],sroles.unsorted,[''],
+            );
+        }
+        fs.writeFileSync(`${fileName}.Roles.txt`, txtRole.join(`\r\n`));
+        // role list docx
+        txtRole.unshift(`${lang.character}\t${lang.dialogues}`,'');
+        let rows = Object.keys(txtRole).length;
         let roleTable = new Table({
             rows: rows,
             columns: 2,
@@ -166,17 +224,14 @@ async function parseFile(){
             margins: { left: '0.2cm', right: '0.2cm', },
             float: { relativeHorizontalPosition: 'center', },
         });
-        roleTable.getCell(0, 0).Properties.setWidth('50%');
-        roleTable.getCell(0, 1).Properties.setWidth('50%');
-        roleTable.getCell(0, 0).addParagraph(new Paragraph('').addRun(new TextRun('Персонаж').bold()));
-        roleTable.getCell(0, 1).addParagraph(new Paragraph('').addRun(new TextRun('Число строк').bold()));
-        for(let r in Object.keys(ass.roles)){
-            r = parseInt(r);
-            let role = Object.keys(ass.roles)[r];   
-            roleTable.getCell(r+1, 0).Properties.setWidth('50%');
-            roleTable.getCell(r+1, 1).Properties.setWidth('50%');
-            roleTable.getCell(r+1, 0).addParagraph(new Paragraph(role));
-            roleTable.getCell(r+1, 1).addParagraph(new Paragraph(ass.roles[role]));
+        for(let r in txtRole){
+            roleStr = txtRole[r];
+            roleStr = roleStr.split(`\t`);
+            roleStr[1] = !roleStr[1] ? '' : roleStr[1];
+            roleTable.getCell(r, 0).Properties.setWidth('50%');
+            roleTable.getCell(r, 1).Properties.setWidth('50%');
+            roleTable.getCell(r, 0).addParagraph(new Paragraph(roleStr[0]));
+            roleTable.getCell(r, 1).addParagraph(new Paragraph(roleStr[1]));
         }
         docRole.addTable(roleTable);
         let docRoleCont = await new Packer().toBuffer(docRole);

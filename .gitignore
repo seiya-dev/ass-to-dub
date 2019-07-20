@@ -1,6 +1,8 @@
 /node_modules/
+roles.json
 *.Dub.json
 *-lock.json
 *.docx
 *.ass
 *.srt
+*.txt
