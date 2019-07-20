@@ -1,10 +1,10 @@
 {
-    male: [
+    "male": [
         "DON HON",
         "SAB",
         "DX"
     ],
-    female: [
+    "female": [
         "SABER",
         "SUSA"
     ]
