@@ -383,7 +383,7 @@ function assFullTimeToDoc(time){
     return time.replace(/\./,':').padStart(11, '0');
 }
 
-function assTimeToDoc(time, timePrev, fullTime){
+function assTimeToDoc(time, timePrev){
     if(!timePrev){
         time = strToTimeArr(time);
         time[2] = Math.round(time[2]);
