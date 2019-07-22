@@ -8,6 +8,20 @@ const fs = require('fs');
 const { Document, Packer, Table, Paragraph, TextRun, } = require('docx');
 let file = '', lang = {}, roles = {};
 
+// predef config
+let config = {
+    "use_never_join_role": true,
+    "never_join_role": "CAPTION",
+    "never_join_dialogues": false,
+    "use_end_time": false,
+    "use_full_time_format": false
+};
+
+// if config file exists
+if(fs.existsSync(`./main.config.json`)){
+    config = require(`./main.config.json`);
+}
+
 // main
 (async function(){
     console.log(`== Advanced SubStation Alpha to Dialogue List ==`);
@@ -290,10 +304,12 @@ async function parseFile(){
             if(actor == ''){
                 current_actor = undefined;
             }
-            if(current_actor != actor){
+            if(current_actor != actor || config.use_never_join_role 
+                    && current_actor == config.never_join_role || config.never_join_dialogues){
                 current_actor = actor;
                 docArr.push({
-                    time: assTimeToDoc(dlgc.Start),
+                    time: config.use_full_time_format ? assFullTimeToDoc(dlgc.Start) : assTimeToDoc(dlgc.Start),
+                    tend: config.use_full_time_format ? assFullTimeToDoc(dlgc.End) : assTimeToDoc(dlgc.End),
                     actor: current_actor,
                     text: cleanDialogDocx,
                 });
@@ -311,12 +327,13 @@ async function parseFile(){
                     docArr[current_row].text += ( cleanPrevDlDocx.slice(-1) != '/' ? ' /' : '' );
                 }
                 docArr[current_row].text += ' ' + cleanDialogDocx;
+                docArr[current_row].tend = config.use_full_time_format ? assFullTimeToDoc(dlgc.End) : assTimeToDoc(dlgc.End);
             }
         }
         // create doc
         let dlgTable = new Table({
             rows: docArr.length,
-            columns: 3,
+            columns: (config.use_end_time ? 4 : 3),
             width: 100,
             widthUnitType: 'pct',
             margins: { left: '0.2cm', right: '0.2cm', },
@@ -324,13 +341,21 @@ async function parseFile(){
         });
         for(let s in docArr){
             s = parseInt(s);
-            let str = docArr[s];   
-            dlgTable.getCell(s, 0).Properties.setWidth('1.35cm');
-            dlgTable.getCell(s, 1).Properties.setWidth('2.15cm');
-            // dlgTable.getCell(s, 2).Properties.setWidth('50%');
-            dlgTable.getCell(s, 0).addParagraph(new Paragraph(str.time));
-            dlgTable.getCell(s, 1).addParagraph(new Paragraph(str.actor));
-            dlgTable.getCell(s, 2).addParagraph(new Paragraph(str.text));
+            let str = docArr[s], 
+                table_seq = 0;
+            dlgTable.getCell(s, table_seq).Properties.setWidth('1.35cm');
+            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.time));
+            table_seq++;
+            if(config.use_end_time){
+                dlgTable.getCell(s, table_seq).Properties.setWidth('1.35cm');
+                dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.tend));
+                table_seq++;
+            }
+            dlgTable.getCell(s, table_seq).Properties.setWidth('2.15cm');
+            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.actor));
+            table_seq++;
+            // dlgTable.getCell(s, table_seq).Properties.setWidth('50%');
+            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.text));
         }
         docFile.addTable(dlgTable);
         let docFileCont = await new Packer().toBuffer(docFile);
@@ -354,7 +379,11 @@ function assTimeToSrt(time){
     return time.replace(/\./,',').padStart(11, '0').padEnd(12, '0');
 }
 
-function assTimeToDoc(time, timePrev){
+function assFullTimeToDoc(time){
+    return time.replace(/\./,':').padStart(11, '0');
+}
+
+function assTimeToDoc(time, timePrev, fullTime){
     if(!timePrev){
         time = strToTimeArr(time);
         time[2] = Math.round(time[2]);
