@@ -313,7 +313,7 @@ async function parseFile(){
                 let subsActor = config.dont_split_subs_actors 
                     ? dlgc.Names.map(a => config.subs_actor_template.replace(/{actor}/,a)).join(config.subs_actor_template_joiner)
                     : config.subs_actor_template.replace(/{actor}/,dlgc.Name);
-                subsActor = subsActor + config.subs_actor_template_after;
+                subsActor = config.subs_actor_template_before + subsActor + config.subs_actor_template_after;
                 assFileEvents.push(`Dialogue: ${dlgc.CleanParam},${subsActor}${dlgc.CleanText}`);
                 srtFile += `${s+1}\r\n`;
                 srtFile += `${assTimeToSrt(dlgc.Start)} --> ${assTimeToSrt(dlgc.End)}\r\n`;
