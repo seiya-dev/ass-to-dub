@@ -9,17 +9,25 @@ const { Document, Packer, Table, Paragraph, TextRun, } = require('docx');
 let file = '', lang = {}, roles = {};
 
 // predef config
-let config = {
+let config = {};
+const preConfig = {
     "use_never_join_role": true,
     "never_join_role": "CAPTION",
     "never_join_dialogues": false,
     "use_end_time": false,
-    "use_full_time_format": false
+    "use_full_time_format": false,
+    "dont_split_subs_actors": false,
+    "subs_actor_template": "[{actor}]",
+    "subs_actor_template_joiner": "/ ",
+    "subs_actor_template_before": "",
+    "subs_actor_template_after": " ",
 };
 
-// if config file exists
+// load config
+config = Object.assign(config, preConfig);
 if(fs.existsSync(`./main.config.json`)){
-    config = require(`./main.config.json`);
+    let loadedConfig = require(`./main.config.json`);
+    config = Object.assign(config, loadedConfig);
 }
 
 // main
@@ -84,6 +92,7 @@ async function parseFile(){
             },
             roles: {},
         };
+    let dialogIndex = 0;
     // collect
     for(let lineIndex in subs){
         let s = subs[lineIndex];
@@ -160,16 +169,21 @@ async function parseFile(){
                     parm.push(ptxt);
                 }
                 if(ass.events.format.length > 0 && type == 'Dialogue' && ptxt != ''){
+                    dialogIndex++;
                     let cprm = parm.slice(0, 9);
                     let current = Object.assign(...ass.events.format.map((k, i) => ({[k]: parm[i]})));
                     current = Object.assign({CleanText: ctxt}, current);
                     let roleNames = current.Name.replace(/\t/g,' ').replace(/  +/g,' ')
-                                        .replace(/;;+/g,';').replace(/^;+/g,'').replace(/;+$/g,'')
-                                        .split(';');
+                                        .replace(/;;+/g,';').replace(/^;+/g,'').replace(/;+$/g,'');
+                    roleNames = roleNames.split(';').map(r => r.trim());
+                    current.id    = dialogIndex;
+                    current.Names = roleNames;
                     for(let r of roleNames){
                         let scurrent = current;
-                        scurrent.Name = r.trim();
-                        cprm[4] = scurrent.Name;
+                        scurrent.Name = r;
+                        if(!config.dont_split_subs_actors){
+                            cprm[4] = scurrent.Name;
+                        }
                         scurrent = Object.assign({CleanParam: cprm.join(',')}, scurrent);
                         ass.events.dialogue.push(scurrent);
                         if(scurrent.Name == ''){
@@ -286,6 +300,7 @@ async function parseFile(){
         assFileEvents.push(`Format: ${ass.events.format.join(', ')}`);
         // prep doc table
         let docArr = [],
+            subtitle_dlg_id = -1,
             current_row = -1,
             current_actor = undefined;
         // make subs and docx
@@ -294,11 +309,20 @@ async function parseFile(){
             let dlgs = ass.events.dialogue;
             let dlgp = dlgs[s-1];
             let dlgc = dlgs[s];
-            let actor = dlgc.Name.toUpperCase();
-            assFileEvents.push(`Dialogue: ${dlgc.CleanParam},[${dlgc.Name.toUpperCase()}] ${dlgc.CleanText}`);
-            srtFile += `${s+1}\r\n`;
-            srtFile += `${assTimeToSrt(dlgc.Start)} --> ${assTimeToSrt(dlgc.End)}\r\n`;
-            srtFile += `[${actor}] ${dlgc.CleanText.replace(/\\n/gi,'\r\n')}\r\n\r\n`;
+            if(subtitle_dlg_id != dlgc.id){
+                let subsActor = config.dont_split_subs_actors 
+                    ? dlgc.Names.map(a => config.subs_actor_template.replace(/{actor}/,a)).join(config.subs_actor_template_joiner)
+                    : config.subs_actor_template.replace(/{actor}/,dlgc.Name);
+                subsActor = subsActor + config.subs_actor_template_after;
+                assFileEvents.push(`Dialogue: ${dlgc.CleanParam},${subsActor}${dlgc.CleanText}`);
+                srtFile += `${s+1}\r\n`;
+                srtFile += `${assTimeToSrt(dlgc.Start)} --> ${assTimeToSrt(dlgc.End)}\r\n`;
+                srtFile += `${subsActor}${dlgc.CleanText}`.replace(/\\n/gi,'\r\n') + `\r\n\r\n`;
+                if(config.dont_split_subs_actors){
+                    subtitle_dlg_id = dlgc.id;
+                }
+            }
+            let actor = dlgc.Name;
             let cleanDialogDocx = dlgc.CleanText.replace(/\\n/gi,' ').replace(/  +/g,' ').trim();
             let cleanPrevDlDocx = dlgp ? dlgp.CleanText.replace(/\\n/gi,' ').replace(/  +/g,' ').trim() : '';
             if(actor == ''){

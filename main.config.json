@@ -1,7 +1,12 @@
 {
     "use_never_join_role": true,
     "never_join_role": "CAPTION",
-    "never_join_dialogues": false,
-    "use_end_time": false,
-    "use_full_time_format": false
+    "never_join_dialogues": true,
+    "use_end_time": true,
+    "use_full_time_format": true,
+    "dont_split_subs_actors": true,
+    "subs_actor_template": "({actor})",
+    "subs_actor_template_joiner": "",
+    "subs_actor_template_before": "",
+    "subs_actor_template_after": ":"
 }
