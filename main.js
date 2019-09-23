@@ -16,6 +16,7 @@ const preConfig = {
     "never_join_dialogues": false,
     "use_end_time": false,
     "use_full_time_format": false,
+    "use_full_time_hide_msec": false,
     "dont_split_subs_actors": false,
     "subs_actor_template": "[{actor}]",
     "subs_actor_template_joiner": "/ ",
@@ -332,8 +333,8 @@ async function parseFile(){
                     && current_actor == config.never_join_role || config.never_join_dialogues){
                 current_actor = actor;
                 docArr.push({
-                    time: config.use_full_time_format ? assFullTimeToDoc(dlgc.Start) : assTimeToDoc(dlgc.Start),
-                    tend: config.use_full_time_format ? assFullTimeToDoc(dlgc.End) : assTimeToDoc(dlgc.End),
+                    time: convTimeDoc(dlgc.Start),
+                    tend: convTimeDoc(dlgc.End),
                     actor: current_actor,
                     text: cleanDialogDocx,
                 });
@@ -351,7 +352,7 @@ async function parseFile(){
                     docArr[current_row].text += ( cleanPrevDlDocx.slice(-1) != '/' ? ' /' : '' );
                 }
                 docArr[current_row].text += ' ' + cleanDialogDocx;
-                docArr[current_row].tend = config.use_full_time_format ? assFullTimeToDoc(dlgc.End) : assTimeToDoc(dlgc.End);
+                docArr[current_row].tend = convTimeDoc(dlgc.End);
             }
         }
         // create doc
@@ -399,11 +400,21 @@ async function parseFile(){
     }
 }
 
+function convTimeDoc(time){
+    return config.use_full_time_format 
+                ? ( config.use_full_time_hide_msec ? assFullTimeToDoc(time) : assFullTimeWMSecToDoc(time) )
+                : assTimeToDoc(time);
+}
+
 function assTimeToSrt(time){
     return time.replace(/\./,',').padStart(11, '0').padEnd(12, '0');
 }
 
 function assFullTimeToDoc(time){
+    return time.replace(/\.\d{2}$/,'').padStart(8, '0');
+}
+
+function assFullTimeWMSecToDoc(time){
     return time.replace(/\./,':').padStart(11, '0');
 }
 

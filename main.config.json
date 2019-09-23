@@ -4,6 +4,7 @@
     "never_join_dialogues": true,
     "use_end_time": true,
     "use_full_time_format": true,
+    "use_full_time_hide_msec": true,
     "dont_split_subs_actors": true,
     "subs_actor_template": "({actor})",
     "subs_actor_template_joiner": "",
