@@ -241,6 +241,7 @@ async function parseFile(){
             );
         }
         fs.writeFileSync(`${fileName}.Roles.txt`, txtRole.join(`\r\n`));
+        fs.writeFileSync(`${fileName}.Roles.csv`, `\ufeff`+txtRole.join(`\r\n`).replace(/\t/g,';'));
         // role list docx
         txtRole.unshift(`${lang.character}\t${lang.dialogues}`,'');
         let rows = Object.keys(txtRole).length;

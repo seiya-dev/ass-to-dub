@@ -6,3 +6,6 @@ roles.json
 *.ass
 *.srt
 *.txt
+*.xls
+*.xlsx
+*.csv
