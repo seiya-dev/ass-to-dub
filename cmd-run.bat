@@ -1,2 +1,4 @@
-@node main.js
-@pause
+@echo off
+node main.js
+echo.
+pause

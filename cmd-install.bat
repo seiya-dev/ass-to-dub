@@ -1,3 +1,2 @@
 @echo off
-echo ^> npm i
-npm i
+npm run inst

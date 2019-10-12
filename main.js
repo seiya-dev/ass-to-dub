@@ -5,7 +5,8 @@ const path = require('path');
 const fs = require('fs');
 
 // plugins
-const { Document, Packer, Table, Paragraph, TextRun, } = require('docx');
+const { Document, Packer, Table, Paragraph, TableCell, TableRow, TextRun,
+    VerticalAlign, WidthType, TableLayoutType } = require('docx');
 let file = '', lang = {}, roles = {};
 
 // predef config
@@ -22,6 +23,9 @@ const preConfig = {
     "subs_actor_template_joiner": "/ ",
     "subs_actor_template_before": "",
     "subs_actor_template_after": " ",
+    "skip_create_ass_mod": false,
+    "skip_create_srt_mod": false,
+    "role_list_format": "txt",
 };
 
 // load config
@@ -205,12 +209,7 @@ async function parseFile(){
         process.exit();
     }
     else{
-        // make files
-        let assFile = '';
-        let srtFile = '';
-        let docFile = new Document();
-        let docRole = new Document();
-        let txtRole = '';
+        // base fn
         let fileName = path.join(file.replace(/(\\|\/)+$/g,'').replace(/\.ass$/,''));
         // make role list
         let sroles = {
@@ -231,6 +230,8 @@ async function parseFile(){
                 sroles.unsorted.push(`${role}\t${ass.roles[role]}`);
             }
         }
+        // txt roles
+        let txtRole = '';
         txtRole = [].concat(
             [`${lang.male}`],[''],sroles.male,[''],
             [`${lang.female}`],[''],sroles.female,[''],
@@ -240,38 +241,49 @@ async function parseFile(){
                 [`${lang.unsorted}`],[''],sroles.unsorted,[''],
             );
         }
-        fs.writeFileSync(`${fileName}.Roles.txt`, txtRole.join(`\r\n`));
-        fs.writeFileSync(`${fileName}.Roles.csv`, `\ufeff`+txtRole.join(`\r\n`).replace(/\t/g,';'));
         // role list docx
         txtRole.unshift(`${lang.character}\t${lang.dialogues}`,'');
-        let rows = Object.keys(txtRole).length;
-        let roleTable = new Table({
-            rows: rows,
-            columns: 2,
-            width: 100,
-            widthUnitType: 'pct',
-            margins: { left: '0.2cm', right: '0.2cm', },
-            float: { relativeHorizontalPosition: 'center', },
-        });
+        // docx roles
+        let docRoleCont = '';
+        let docRole = new Document();
+        let rolesRows = [];
         for(let r in txtRole){
             roleStr = txtRole[r];
             roleStr = roleStr.split(`\t`);
             roleStr[1] = !roleStr[1] ? '' : roleStr[1];
-            roleTable.getCell(r, 0).Properties.setWidth('50%');
-            roleTable.getCell(r, 1).Properties.setWidth('50%');
-            roleTable.getCell(r, 0).addParagraph(new Paragraph(roleStr[0]));
-            roleTable.getCell(r, 1).addParagraph(new Paragraph(roleStr[1]));
+            let rolesRow = new TableRow({
+                children: [
+                    addTableCell(roleStr[0], '50%'),
+                    addTableCell(roleStr[1], '50%'),
+                ],
+            });
+            rolesRows.push(rolesRow);
         }
-        docRole.addTable(roleTable);
-        let docRoleCont = await new Packer().toBuffer(docRole);
-        try{
-            fs.writeFileSync(`${fileName}.Roles.docx`, docRoleCont);
-        }
-        catch(e){
-            console.log(e);
-            console.log(`[ERROR] File ${fileName}.Roles.docx not saved!`);
+        docRole.addSection({children:[
+            addTable(rolesRows)
+        ]});
+        // delete docRole.document.body.root[0];
+        docRoleCont = await Packer.toBuffer(docRole);
+        // save role list
+        switch(config.role_list_format){
+            case 'docx':
+                try{
+                    fs.writeFileSync(`${fileName}.Roles.docx`, docRoleCont);
+                }
+                catch(e){
+                    console.log(e);
+                    console.log(`[ERROR] File ${fileName}.Roles.docx not saved!`);
+                }
+                break;
+            case 'csv':
+                fs.writeFileSync(`${fileName}.Roles.csv`, `\ufeff`+txtRole.join(`\r\n`).replace(/\t/g,';'));
+                break;
+            case 'txt':
+            default:
+                fs.writeFileSync(`${fileName}.Roles.txt`, txtRole.join(`\r\n`)); 
         }
         // make new ass, srt and docx
+        let assFile = '';
         assFile = [
             `[Script Info]`,
             `Title: ${ass.script_info.Title}`,
@@ -301,6 +313,7 @@ async function parseFile(){
         let assFileEvents = [`[Events]`];
         assFileEvents.push(`Format: ${ass.events.format.join(', ')}`);
         // prep doc table
+        let srtFile = '';
         let docArr = [],
             subtitle_dlg_id = -1,
             current_row = -1,
@@ -357,39 +370,37 @@ async function parseFile(){
             }
         }
         // create doc
-        let dlgTable = new Table({
-            rows: docArr.length,
-            columns: (config.use_end_time ? 4 : 3),
-            width: 100,
-            widthUnitType: 'pct',
-            margins: { left: '0.2cm', right: '0.2cm', },
-            float: { relativeHorizontalPosition: 'center', },
-        });
+        let docFile = new Document();
+        let docFileCont = '';
+        let dialogRows = [];
         for(let s in docArr){
             s = parseInt(s);
-            let str = docArr[s], 
-                table_seq = 0;
-            dlgTable.getCell(s, table_seq).Properties.setWidth('1.35cm');
-            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.time));
-            table_seq++;
+            let str = docArr[s];
+            let dialogCells = [];
+            dialogCells.push(addTableCell(str.time, '1.35cm'));
             if(config.use_end_time){
-                dlgTable.getCell(s, table_seq).Properties.setWidth('1.35cm');
-                dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.tend));
-                table_seq++;
+                dialogCells.push(addTableCell(str.tend, '1.35cm'));
             }
-            dlgTable.getCell(s, table_seq).Properties.setWidth('2.15cm');
-            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.actor));
-            table_seq++;
-            // dlgTable.getCell(s, table_seq).Properties.setWidth('50%');
-            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.text));
+            dialogCells.push(addTableCell(str.actor, '2.15cm'));
+            dialogCells.push(addTableCell(str.text, '50%'));
+            let dialogRow = new TableRow({
+                children: dialogCells,
+            });
+            dialogRows.push(dialogRow);
         }
-        docFile.addTable(dlgTable);
-        let docFileCont = await new Packer().toBuffer(docFile);
+        docFile.addSection({children:[
+            addTable(dialogRows)
+        ]});
+        docFileCont = await Packer.toBuffer(docFile);
         // save
         assFileEvents.push(`\r\n`);
         assFile += assFileEvents.join(`\r\n`);
-        fs.writeFileSync(`${fileName}.Dub.ass`, assFile);
-        fs.writeFileSync(`${fileName}.Dub.srt`, srtFile);
+        if(!config.skip_create_ass_mod){
+            fs.writeFileSync(`${fileName}.Dub.ass`, assFile);
+        }
+        if(!config.skip_create_srt_mod){
+            fs.writeFileSync(`${fileName}.Dub.srt`, srtFile);
+        }
         try{
             fs.writeFileSync(`${fileName}.Dub.docx`, docFileCont);
         }
@@ -399,6 +410,27 @@ async function parseFile(){
         }
         // fs.writeFileSync(`${fileName}.Dub.json`, JSON.stringify(ass,null,'    '));
     }
+}
+
+function addTableCell(content, size){
+    let cell = new TableCell({
+        children: [new Paragraph({ text: content })],
+        verticalAlign: VerticalAlign.CENTER,
+        // margins: { left: '0.2cm', right: '0.2cm', },
+        width: { size: size, },
+    });
+    return cell;
+}
+
+function addTable(content){
+    let table = new Table({
+        rows: content,
+        width: { size: 100, type: WidthType.PERCENTAGE, },
+        margins: { left: '0.2cm', right: '0.2cm', },
+        layout: TableLayoutType.FIXED,
+        // float: { relativeHorizontalPosition: 'center', },
+    });
+    return table;
 }
 
 function convTimeDoc(time){
