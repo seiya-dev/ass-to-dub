@@ -262,7 +262,7 @@ async function parseFile(){
         docRole.addSection({children:[
             addTable(rolesRows)
         ]});
-        // delete docRole.document.body.root[0];
+        docRole = fixEmptyParagraph(docRole);
         docRoleCont = await Packer.toBuffer(docRole);
         // save role list
         switch(config.role_list_format){
@@ -382,7 +382,8 @@ async function parseFile(){
                 dialogCells.push(addTableCell(str.tend, '1.35cm'));
             }
             dialogCells.push(addTableCell(str.actor, '2.15cm'));
-            dialogCells.push(addTableCell(str.text, '50%'));
+            let dialCellWidth = config.use_end_time ? '50%' : '60%';
+            dialogCells.push(addTableCell(str.text, dialCellWidth));
             let dialogRow = new TableRow({
                 children: dialogCells,
             });
@@ -391,6 +392,7 @@ async function parseFile(){
         docFile.addSection({children:[
             addTable(dialogRows)
         ]});
+        docFile = fixEmptyParagraph(docFile);
         docFileCont = await Packer.toBuffer(docFile);
         // save
         assFileEvents.push(`\r\n`);
@@ -412,13 +414,35 @@ async function parseFile(){
     }
 }
 
+function fixEmptyParagraph(doc){
+    // Should fix empty paragraph bug
+    let sections = doc.document.body.root.length;
+    if(
+        sections > 0 &&
+        doc.document.body.root[0].rootKey == 'w:p' &&
+        doc.document.body.root[0].properties.root.length == 0
+    ){
+        doc.document.body.root[0].deleted = true;
+    }
+    return doc;
+}
+
+function fixCellWidth(cell, size){
+    let { TableCellWidth } = require('docx');
+    let cellWidth = new TableCellWidth(size);
+    cell.root[0].cellWidth = cellWidth;
+    cell.properties.root.push(cellWidth);
+    cell.properties.cellWidth = cellWidth;
+    return cell;
+}
+
 function addTableCell(content, size){
     let cell = new TableCell({
         children: [new Paragraph({ text: content })],
         verticalAlign: VerticalAlign.CENTER,
-        // margins: { left: '0.2cm', right: '0.2cm', },
         width: { size: size, },
     });
+    cell = fixCellWidth(cell, size);
     return cell;
 }
 
@@ -428,7 +452,7 @@ function addTable(content){
         width: { size: 100, type: WidthType.PERCENTAGE, },
         margins: { left: '0.2cm', right: '0.2cm', },
         layout: TableLayoutType.FIXED,
-        // float: { relativeHorizontalPosition: 'center', },
+        float: { relativeHorizontalPosition: 'center', },
     });
     return table;
 }
