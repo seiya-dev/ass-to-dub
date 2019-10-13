@@ -15,6 +15,7 @@ const preConfig = {
     "use_never_join_role": true,
     "never_join_role": "CAPTION",
     "never_join_dialogues": false,
+    "use_start_time": true,
     "use_end_time": false,
     "use_full_time_format": false,
     "use_full_time_hide_msec": false,
@@ -30,8 +31,8 @@ const preConfig = {
 
 // load config
 config = Object.assign(config, preConfig);
-if(fs.existsSync(`./main.config.json`)){
-    let loadedConfig = require(`./main.config.json`);
+if(fs.existsSync(`./set_config.json`)){
+    let loadedConfig = require(`./set_config.json`);
     config = Object.assign(config, loadedConfig);
 }
 
@@ -49,8 +50,8 @@ if(fs.existsSync(`./main.config.json`)){
         console.error(`[ERROR] Language file not found!`);
         process.exit();
     }
-    if(fs.existsSync(`./roles.json`)){
-        roles = require(`./roles.json`);
+    if(fs.existsSync(`./set_roles.json`)){
+        roles = require(`./set_roles.json`);
     }
     if(roles.toString() != '[object Object]'){
         roles = {};
@@ -373,17 +374,19 @@ async function parseFile(){
         let docFile = new Document();
         let docFileCont = '';
         let dialogRows = [];
+        let dialogCellWidths = calcCellWidths();
         for(let s in docArr){
             s = parseInt(s);
             let str = docArr[s];
             let dialogCells = [];
-            dialogCells.push(addTableCell(str.time, '1.35cm'));
-            if(config.use_end_time){
-                dialogCells.push(addTableCell(str.tend, '1.35cm'));
+            if(config.use_start_time){
+                dialogCells.push(addTableCell(str.time, dialogCellWidths[0] + 'cm'));
             }
-            dialogCells.push(addTableCell(str.actor, '2.15cm'));
-            let dialCellWidth = config.use_end_time ? '50%' : '60%';
-            dialogCells.push(addTableCell(str.text, dialCellWidth));
+            if(config.use_end_time){
+                dialogCells.push(addTableCell(str.tend, dialogCellWidths[1] + 'cm'));
+            }
+            dialogCells.push(addTableCell(str.actor, dialogCellWidths[2] + 'cm'));
+            dialogCells.push(addTableCell(str.text, dialogCellWidths[3] + 'cm'));
             let dialogRow = new TableRow({
                 children: dialogCells,
             });
@@ -457,8 +460,32 @@ function addTable(content){
     return table;
 }
 
+function calcCellWidths(){
+    let w = [ 0, 0, 2.20, 16.32];
+    if(config.use_start_time){
+        w[0] = getTimeCellWidth();
+        w[3] -= w[0];
+    }
+    if(config.use_end_time){
+        w[1] = getTimeCellWidth();
+        w[3] -= w[1];
+    }
+    w[3] -= w[2];
+    return w;
+}
+
+function getTimeCellWidth(){
+    if(config.use_full_time_format && !config.use_full_time_hide_msec){
+        return 2.20;
+    }
+    if(config.use_full_time_format){
+        return 1.70;
+    }
+    return 1.50;
+}
+
 function convTimeDoc(time){
-    return config.use_full_time_format 
+    return config.use_full_time_format
                 ? ( config.use_full_time_hide_msec ? assFullTimeToDoc(time) : assFullTimeWMSecToDoc(time) )
                 : assTimeToDoc(time);
 }
