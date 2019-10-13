@@ -5,6 +5,7 @@
     "use_start_time": true,
     "use_end_time": false,
     "use_full_time_format": false,
+    "use_docx_string_splitter": true,
     "skip_create_ass_mod": true,
     "skip_create_srt_mod": true,
     "role_list_format": "txt"

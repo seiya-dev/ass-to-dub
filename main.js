@@ -7,7 +7,10 @@ const fs = require('fs');
 // plugins
 const { Document, Packer, Table, Paragraph, TableCell, TableRow, TextRun,
     VerticalAlign, WidthType, TableLayoutType } = require('docx');
+
+// defined
 let file = '', lang = {}, roles = {};
+const docxStringSplitter = '{\\r\\n}';
 
 // predef config
 let config = {};
@@ -20,6 +23,7 @@ const preConfig = {
     "use_full_time_format": false,
     "use_full_time_hide_msec": false,
     "dont_split_subs_actors": false,
+    "use_docx_string_splitter": false,
     "subs_actor_template": "[{actor}]",
     "subs_actor_template_joiner": "/ ",
     "subs_actor_template_before": "",
@@ -358,10 +362,15 @@ async function parseFile(){
             else{
                 let startStrMatch = /^\(\d{1,2}(-|:)\d{2}\) |^\d{1,2}(-|:)\d{2} /;
                 if(cleanPrevDlDocx.slice(-2) == '//' || assTimeToDoc(dlgc.Start, dlgp.End) == 5 && cleanPrevDlDocx.slice(-1) != '/' ){
-                    if(cleanDialogDocx.match(startStrMatch)){ // cleanPrevDlDocx.slice(-2) == '//' &&
+                    if(cleanDialogDocx.match(startStrMatch)){
                         cleanDialogDocx = cleanDialogDocx.replace(startStrMatch,'');
                     }
-                    docArr[current_row].text += ( cleanPrevDlDocx.slice(-2) != '//' ? ' //' : '' ) + assTimeToDoc(dlgc.Start);
+                    if(cleanPrevDlDocx.slice(-2) == '//'){
+                        docArr[current_row].text = docArr[current_row].text.replace(/\/\/$/,'');
+                    }
+                    docArr[current_row].text += 
+                        (config.use_docx_string_splitter ? docxStringSplitter : ' ')
+                        + '//' + assTimeToDoc(dlgc.Start);
                 }
                 if(cleanPrevDlDocx.slice(-1) == '/'  || assTimeToDoc(dlgc.Start, dlgp.End) == 1 && cleanPrevDlDocx.slice(-1) != '/' ){
                     docArr[current_row].text += ( cleanPrevDlDocx.slice(-1) != '/' ? ' /' : '' );
@@ -440,8 +449,13 @@ function fixCellWidth(cell, size){
 }
 
 function addTableCell(content, size){
+    let cellContent = [];
+    content = content.split(docxStringSplitter);
+    for(let c of content){
+        cellContent.push(new Paragraph({ text: c }));
+    }
     let cell = new TableCell({
-        children: [new Paragraph({ text: content })],
+        children: cellContent,
         verticalAlign: VerticalAlign.CENTER,
         width: { size: size, },
     });
