@@ -461,7 +461,7 @@ function addTable(content){
 }
 
 function calcCellWidths(){
-    let w = [ 0, 0, 2.20, 16.32];
+    let w = [ 0, 0, 3.00, 16.32];
     if(config.use_start_time){
         w[0] = getTimeCellWidth();
         w[3] -= w[0];
