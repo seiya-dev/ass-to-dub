@@ -158,7 +158,7 @@ async function parseFile(){
                 let type = s.split(':')[0];
                 let parm = s.replace(new RegExp(`^${type}: `),'');
                 if(type == 'Format'){
-                    ass.styles.format = parm.split(', ');
+                    ass.styles.format = parm.split(',').map(p=>p.trim())
                     continue;
                 }
                 else{
@@ -175,7 +175,7 @@ async function parseFile(){
                 let parm = s.replace(new RegExp(`^${type}: `),'');
                 let ptxt = '', ctxt = '';
                 if(type == 'Format'){
-                    ass.events.format = parm.split(', ');
+                    ass.events.format = parm.split(',').map(p=>p.trim())
                     continue;
                 }
                 else{
