@@ -79,7 +79,12 @@ if(fs.existsSync(configFile)){
         file = f;
         if(fs.existsSync(file)){
             console.log(`[INFO] Processing ${file}...`);
-            await parseFile();
+            try{
+                await parseFile();
+            }
+            catch(e){
+                console.log(e);
+            }
             console.log(`[INFO] Done!`);
         }
     }
@@ -190,6 +195,12 @@ async function parseFile(){
                     let cprm = parm.slice(0, 9);
                     let current = Object.assign(...ass.events.format.map((k, i) => ({[k]: parm[i]})));
                     current = Object.assign({CleanText: ctxt}, current);
+                    if(typeof current.Name != 'string'){
+                        current.Name = '';
+                    }
+                    if(current.Name == '' && typeof current.Actor == 'string'){
+                        current.Name = current.Actor;
+                    }
                     let roleNames = current.Name.replace(/\t/g,' ').replace(/  +/g,' ')
                                         .replace(/;;+/g,';').replace(/^;+/g,'').replace(/;+$/g,'');
                     roleNames = roleNames.split(';').map(r => r.trim());
@@ -218,7 +229,7 @@ async function parseFile(){
     }
     if(ass.script_info.ScriptType != 'v4.00+'){
         console.log(`[WARN] Supported only script types v4.00+!`);
-        process.exit();
+        return;
     }
     else{
         // base fn
@@ -298,7 +309,7 @@ async function parseFile(){
         let assFile = '';
         assFile = [
             `[Script Info]`,
-            `Title: ${ass.script_info.Title}`,
+            `Title: ${ass.script_info.Title?ass.script_info.Title:''}`,
             `Original Translation: `,
             `Original Editing: `,
             `Original Timing: `,
@@ -307,10 +318,10 @@ async function parseFile(){
             `Update Details: `,
             `ScriptType: v4.00+`,
             `Collisions: Normal`,
-            `PlayResX: ${ass.script_info.PlayResX}`,
-            `PlayResY: ${ass.script_info.PlayResY}`,
+            (ass.script_info.PlayResX?`PlayResX: ${ass.script_info.PlayResX}`:''),
+            (ass.script_info.PlayResY?`PlayResX: ${ass.script_info.PlayResY}`:''),
             `Timer: 0.0000`,
-            `WrapStyle: ${ass.script_info.WrapStyle}`,
+            (ass.script_info.WrapStyle?`PlayResX: ${ass.script_info.WrapStyle}`:''),
             `\r\n`,
         ].join(`\r\n`);
         // restore styles
