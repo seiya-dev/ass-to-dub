@@ -35,8 +35,9 @@ const preConfig = {
 
 // load config
 config = Object.assign(config, preConfig);
-if(fs.existsSync(`./set_config.json`)){
-    let loadedConfig = require(`./set_config.json`);
+const configFile = __dirname + `/set_config.json`;
+if(fs.existsSync(configFile)){
+    let loadedConfig = require(configFile);
     config = Object.assign(config, loadedConfig);
 }
 
@@ -47,8 +48,9 @@ if(fs.existsSync(`./set_config.json`)){
     const langRegx = /^set_([a-z]{2})$/;
     let setLangFile = filterByRegx(fs.readdirSync('./language/'),langRegx);
     setLangFile = setLangFile.length > 0 ? setLangFile[0].match(langRegx)[1] : 'en';
-    if(fs.existsSync(`./language/${setLangFile}.json`)){
-        lang = require(`./language/${setLangFile}.json`);
+    const langFile = __dirname + `/language/${setLangFile}.json`;
+    if(fs.existsSync(langFile)){
+        lang = require(langFile);
     }
     else{
         console.error(`[ERROR] Language file not found!`);
@@ -67,7 +69,12 @@ if(fs.existsSync(`./set_config.json`)){
         roles.female = [];
     }
     require('process').chdir(`${__dirname}/subtitles/`);
-    let fls = filterByRegx(fs.readdirSync('.'),/(?<!\.Dub)\.ass$/);
+    const subsDir = fs.readdirSync(process.cwd())
+    let fls = filterByRegx(subsDir,/(?<!\.Dub)\.ass$/);
+    if(fls.length<1){
+        console.log(`[ERROR] No input files!`);
+        process.exit();
+    }
     for(let f of fls){
         file = f;
         if(fs.existsSync(file)){

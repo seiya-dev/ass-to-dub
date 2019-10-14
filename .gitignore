@@ -1,3 +1,4 @@
+/build/
 /node_modules/
 roles.json
 *.Dub.json

@@ -1,6 +1,6 @@
 {
     "name": "ass-to-dub",
-    "version": "1.8.0-dev.2",
+    "version": "1.8.0-dev.3",
     "description": "Convert ASS subtitles to Dialogue List in DOCX format for dubbing",
     "keywords": [
         "util",
@@ -25,6 +25,7 @@
     },
     "scripts": {
         "inst": "npm install --no-bin-links",
+        "build-win": "if exist build rmdir build \/s \/q && mkdir \"build/subtitles\" && nexe \"./main.js\" -r \"./language/*\" -o \"./build/ass-to-dub.exe\" && if exist set_config.json copy set_config.json build",
         "test": "echo \"Error: no test specified\" && exit 1"
     }
 }
