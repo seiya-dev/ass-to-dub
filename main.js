@@ -292,7 +292,7 @@ async function parseFile(){
                 break;
             case 'txt':
             default:
-                fs.writeFileSync(`${fileName}.Roles.txt`, txtRole.join(`\r\n`)); 
+                fs.writeFileSync(`${fileName}.Roles.txt`, `\ufeff`+txtRole.join(`\r\n`)); 
         }
         // make new ass, srt and docx
         let assFile = '';
@@ -417,10 +417,10 @@ async function parseFile(){
         assFileEvents.push(`\r\n`);
         assFile += assFileEvents.join(`\r\n`);
         if(!config.skip_create_ass_mod){
-            fs.writeFileSync(`${fileName}.Dub.ass`, assFile);
+            fs.writeFileSync(`${fileName}.Dub.ass`, `\ufeff`+assFile);
         }
         if(!config.skip_create_srt_mod){
-            fs.writeFileSync(`${fileName}.Dub.srt`, srtFile);
+            fs.writeFileSync(`${fileName}.Dub.srt`, `\ufeff`+srtFile);
         }
         try{
             fs.writeFileSync(`${fileName}.Dub.docx`, docFileCont);
