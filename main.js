@@ -15,6 +15,7 @@ const docxStringSplitter = '{\\r\\n}';
 // predef config
 let config = {};
 const preConfig = {
+    "language": "ru",
     "use_never_join_role": true,
     "never_join_role": "CAPTION",
     "never_join_dialogues": false,
@@ -24,6 +25,8 @@ const preConfig = {
     "use_full_time_hide_msec": false,
     "dont_split_subs_actors": false,
     "use_docx_string_splitter": false,
+    "docx_join_time_short": 1,
+    "docx_join_time_long": 5,
     "subs_actor_template": "[{actor}]",
     "subs_actor_template_joiner": "/ ",
     "subs_actor_template_before": "",
@@ -45,10 +48,15 @@ if(fs.existsSync(configFile)){
 (async function(){
     console.log(`== Advanced SubStation Alpha to Dialogue List ==`);
     console.log(`==             by  Seiya Loveless             ==`);
-    const langRegx = /^set_([a-z]{2})$/;
-    let setLangFile = filterByRegx(fs.readdirSync('./language/'),langRegx);
-    setLangFile = setLangFile.length > 0 ? setLangFile[0].match(langRegx)[1] : 'en';
-    const langFile = __dirname + `/language/${setLangFile}.json`;
+    // set lang
+    let langCode        = 'ru.json';
+    const langFilesPath = __dirname + `/language/`;
+    if(typeof config.language == 'string' && config.language.match(/^[a-z]{2}$/)){
+        config.language += '.json';
+        const langFiles = fs.readdirSync(langFilesPath);
+        langCode = langFiles.includes(config.language) ? config.language : 'ru.json';
+    }
+    const langFile = langFilesPath + langCode;
     if(fs.existsSync(langFile)){
         lang = require(langFile);
     }
@@ -56,8 +64,9 @@ if(fs.existsSync(configFile)){
         console.error(`[ERROR] Language file not found!`);
         process.exit();
     }
-    if(fs.existsSync(`./set_roles.json`)){
-        roles = require(`./set_roles.json`);
+    const setRolesFile = __dirname + `/set_roles.json`;
+    if(fs.existsSync(setRolesFile)){
+        roles = require(setRolesFile);
     }
     if(roles.toString() != '[object Object]'){
         roles = {};
@@ -558,10 +567,10 @@ function assTimeToDoc(time, timePrev){
         time1 = time1[0]*60*60 + time1[1]*60 + time1[2];
         let time2 = strToTimeArr(timePrev);
         time2 = time2[0]*60*60 + time2[1]*60 + time2[2];
-        if(time1 - time2 > 4.99){
+        if(time1 - time2 > config.docx_join_time_long - 0.01){
             return 5;
         }
-        if(time1 - time2 > 0.99){
+        if(time1 - time2 > config.docx_join_time_short - 0.01){
             return 1;
         }
         return 0;
