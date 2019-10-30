@@ -371,7 +371,6 @@ async function parseFile(){
             }
             let actor = dlgc.Name;
             let cleanDialogDocx = dlgc.CleanText.replace(/\\n/gi,' ').replace(/  +/g,' ').trim();
-            let cleanPrevDlDocx = dlgp ? dlgp.CleanText.replace(/\\n/gi,' ').replace(/  +/g,' ').trim() : '';
             if(actor == ''){
                 current_actor = undefined;
             }
@@ -387,19 +386,32 @@ async function parseFile(){
                 current_row++;
             }
             else{
-                let startStrMatch = /^\(\d{1,2}(-|:)\d{2}\) |^\d{1,2}(-|:)\d{2} /;
-                if(cleanPrevDlDocx.slice(-2) == '//' || assTimeToDoc(dlgc.Start, dlgp.End) == 5 && cleanPrevDlDocx.slice(-1) != '/' ){
-                    if(cleanDialogDocx.match(startStrMatch)){
-                        cleanDialogDocx = cleanDialogDocx.replace(startStrMatch,'');
+                let cleanPrevDlDocx = docArr[current_row].text;
+                let stringTimeMatch = `(?:\\()\\d{1,2}(-|:)\\d{2}(?:\\))`;
+                let strStartReplace  = new RegExp(`^(|\\/+)(| +)${stringTimeMatch}`);
+                let strEndReplace    = new RegExp(`(\\/+)(| +)${stringTimeMatch}$`);
+                if(cleanPrevDlDocx.slice(-2) == '//'
+                    || cleanDialogDocx.slice(0, 2) == '//'
+                    || cleanDialogDocx.match(strStartReplace)
+                    || cleanPrevDlDocx.match(strEndReplace)
+                    || assTimeToDoc(dlgc.Start, dlgp.End) == 5 && cleanPrevDlDocx.slice(-1) != '/'
+                ){
+                    if(cleanDialogDocx.match(strStartReplace)){
+                        cleanDialogDocx = cleanDialogDocx.replace(strStartReplace,'').trim();
+                    }
+                    if(cleanPrevDlDocx.match(strEndReplace)){
+                        cleanPrevDlDocx = cleanPrevDlDocx.replace(strEndReplace,'').trim();
                     }
                     if(cleanPrevDlDocx.slice(-2) == '//'){
-                        docArr[current_row].text = docArr[current_row].text.replace(/\/\/$/,'');
+                        cleanPrevDlDocx = cleanPrevDlDocx.replace(/\/+$/,'').trim();
                     }
-                    docArr[current_row].text += 
-                        (config.use_docx_string_splitter ? docxStringSplitter : ' ')
+                    docArr[current_row].text = cleanPrevDlDocx
+                        + (config.use_docx_string_splitter ? docxStringSplitter : ' ')
                         + '//' + assTimeToDoc(dlgc.Start);
                 }
-                if(cleanPrevDlDocx.slice(-1) == '/'  || assTimeToDoc(dlgc.Start, dlgp.End) == 1 && cleanPrevDlDocx.slice(-1) != '/' ){
+                if(cleanPrevDlDocx.slice(-1) == '/'
+                    || assTimeToDoc(dlgc.Start, dlgp.End) == 1 && cleanPrevDlDocx.slice(-1) != '/'
+                ){
                     docArr[current_row].text += ( cleanPrevDlDocx.slice(-1) != '/' ? ' /' : '' );
                 }
                 docArr[current_row].text += ' ' + cleanDialogDocx;
@@ -547,11 +559,11 @@ function assTimeToDoc(time, timePrev){
     if(!timePrev){
         time = strToTimeArr(time);
         time[2] = Math.round(time[2]);
-        if(time[2] > 60){
+        if(time[2] > 59){
             time[2] = 0;
             time[1]++;
         }
-        if(time[1] > 60){
+        if(time[1] > 59){
             time[1] = 0;
             time[0]++;
         }
@@ -564,13 +576,13 @@ function assTimeToDoc(time, timePrev){
     }
     else{
         let time1 = strToTimeArr(time);
-        time1 = time1[0]*60*60 + time1[1]*60 + time1[2];
+        time1 = time1[0] * 60 * 60 + time1[1] * 60 + time1[2];
         let time2 = strToTimeArr(timePrev);
-        time2 = time2[0]*60*60 + time2[1]*60 + time2[2];
-        if(time1 - time2 > config.docx_join_time_long - 0.01){
+        time2 = time2[0] * 60 * 60 + time2[1] * 60 + time2[2];
+        if(time1 - time2 > config.docx_join_time_long - 0.001){
             return 5;
         }
-        if(time1 - time2 > config.docx_join_time_short - 0.01){
+        if(time1 - time2 > config.docx_join_time_short - 0.001){
             return 1;
         }
         return 0;
