@@ -62,6 +62,7 @@ if(fs.existsSync(configFile)){
     }
     else{
         console.error(`[ERROR] Language file not found!`);
+        await doPause();
         process.exit();
     }
     const setRolesFile = __dirname + `/set_roles.json`;
@@ -82,6 +83,7 @@ if(fs.existsSync(configFile)){
     let fls = filterByRegx(subsDir,/(?<!\.Dub)\.ass$/);
     if(fls.length<1){
         console.log(`[ERROR] No input files!`);
+        await doPause();
         process.exit();
     }
     for(let f of fls){
@@ -97,6 +99,8 @@ if(fs.existsSync(configFile)){
             console.log(`[INFO] Done!`);
         }
     }
+    await doPause();
+    process.exit();
 }());
 
 function filterByRegx(arr,regx) {
@@ -478,15 +482,6 @@ function fixEmptyParagraph(doc){
     return doc;
 }
 
-function fixCellWidth(cell, size){
-    let { TableCellWidth } = require('docx');
-    let cellWidth = new TableCellWidth(size);
-    cell.root[0].cellWidth = cellWidth;
-    cell.properties.root.push(cellWidth);
-    cell.properties.cellWidth = cellWidth;
-    return cell;
-}
-
 function addTableCell(content, size){
     let cellContent = [];
     content = content.split(docxStringSplitter);
@@ -496,9 +491,9 @@ function addTableCell(content, size){
     let cell = new TableCell({
         children: cellContent,
         verticalAlign: VerticalAlign.CENTER,
-        width: { size: size, },
+        width: { size: size },
     });
-    cell = fixCellWidth(cell, size);
+    cell.properties.setWidth(size);
     return cell;
 }
 
@@ -595,4 +590,18 @@ function strToTimeArr(time){
     time[1] = parseInt(time[1]);
     time[2] = parseFloat(time[2]);
     return time;
+}
+
+async function doPause(){
+    console.log(`Press any key to continue...`);
+    process.stdin.setRawMode(true);
+    return new Promise(resolve => process.stdin.once('data', data => {
+        const byteArray = [...data];
+        if (byteArray.length > 0 && byteArray[0] === 3) {
+            console.log('^C');
+            process.exit(1);
+        }
+        process.stdin.setRawMode(false);
+        resolve();
+    }));
 }

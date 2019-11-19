@@ -1,6 +1,6 @@
 {
     "name": "ass-to-dub",
-    "version": "1.8.0-dev.9",
+    "version": "1.8.0-dev.10",
     "description": "Convert ASS subtitles to Dialogue List in DOCX format for dubbing",
     "keywords": [
         "util",
@@ -23,11 +23,15 @@
     "dependencies": {
         "docx": "^5.0.0-rc7"
     },
+    "devDependencies": {
+        "fs-extra": "^8.1.0",
+        "nexe": "^3.3.2",
+        "removeNPMAbsolutePaths": "^2.0.0"
+    },
     "scripts": {
-        "inst": "npm install --no-bin-links",
-        "build-dep": "npm i -g removeNPMAbsolutePaths && npm i -g nexe",
-        "build-win-pre": "removeNPMAbsolutePaths . && ( if exist build rmdir \"./build/\" /s /q ) && mkdir \"./build/subtitles/\"",
-        "build-win": "npm run build-win-pre && nexe \"./main.js\" -r \"./language/*\" -t \"windows-x64\" -o \"./build/ass-to-dub.exe\" && ( if exist set_config.json copy set_config.json build )",
+        "build-win64": "node build win64",
+        "build-linux64": "node build linux64",
+        "build-macos64": "node build macos64",
         "test": "echo \"Error: no test specified\" && exit 1"
     }
 }
