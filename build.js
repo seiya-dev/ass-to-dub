@@ -28,7 +28,7 @@ const { compile } = require('nexe');
     fse.mkdirSync(`${buildDir}/subtitles`);
     const buildConfig = {
         input: './main.js',
-        output: `${buildDir}/ass-to-dub`,
+        output: `${buildDir}/${pkg.name}`,
         target: getTarget(buildType),
         resources: [
             './language/*',
