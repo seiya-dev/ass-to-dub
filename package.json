@@ -1,6 +1,6 @@
 {
     "name": "ass-to-dub",
-    "version": "1.7.0",
+    "version": "1.8.1",
     "description": "Convert ASS subtitles to Dialogue List in DOCX format for dubbing",
     "keywords": [
         "util",
@@ -21,12 +21,17 @@
     "license": "MIT",
     "main": "main.js",
     "dependencies": {
-        "docx": "5.0.0-rc4"
+        "docx": "^5.0.2"
+    },
+    "devDependencies": {
+        "fs-extra": "^8.1.0",
+        "nexe": "^3.3.2",
+        "removeNPMAbsolutePaths": "^2.0.0"
     },
     "scripts": {
-        "install": "npm install --no-bin-links",
-        "i": "npm i --no-bin-links",
-        "main": "node main",
+        "build-win64": "node build win64",
+        "build-linux64": "node build linux64",
+        "build-macos64": "node build macos64",
         "test": "echo \"Error: no test specified\" && exit 1"
     }
 }

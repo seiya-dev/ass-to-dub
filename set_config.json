@@ -1,0 +1,21 @@
+{
+    "language": "ru",
+    "use_never_join_role": true,
+    "never_join_role": "CAPTION",
+    "never_join_dialogues": false,
+    "use_start_time": true,
+    "use_end_time": false,
+    "use_full_time_format": false,
+    "use_full_time_hide_msec": false,
+    "dont_split_subs_actors": false,
+    "use_docx_string_splitter": true,
+    "docx_join_time_short": 1,
+    "docx_join_time_long": 5,
+    "subs_actor_template": "[{actor}]",
+    "subs_actor_template_joiner": "/ ",
+    "subs_actor_template_before": "",
+    "subs_actor_template_after": " ",
+    "skip_create_ass_mod": true,
+    "skip_create_srt_mod": true,
+    "role_list_format": "txt"
+}

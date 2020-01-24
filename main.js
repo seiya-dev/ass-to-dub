@@ -5,29 +5,42 @@ const path = require('path');
 const fs = require('fs');
 
 // plugins
-const { Document, Packer, Table, Paragraph, TextRun, } = require('docx');
+const { Document, Packer, Table, Paragraph, TableCell, TableRow, TextRun,
+    VerticalAlign, WidthType, TableLayoutType } = require('docx');
+
+// defined
 let file = '', lang = {}, roles = {};
+const docxStringSplitter = '{\\r\\n}';
 
 // predef config
 let config = {};
 const preConfig = {
+    "language": "ru",
     "use_never_join_role": true,
     "never_join_role": "CAPTION",
     "never_join_dialogues": false,
+    "use_start_time": true,
     "use_end_time": false,
     "use_full_time_format": false,
     "use_full_time_hide_msec": false,
     "dont_split_subs_actors": false,
+    "use_docx_string_splitter": false,
+    "docx_join_time_short": 1,
+    "docx_join_time_long": 5,
     "subs_actor_template": "[{actor}]",
     "subs_actor_template_joiner": "/ ",
     "subs_actor_template_before": "",
     "subs_actor_template_after": " ",
+    "skip_create_ass_mod": false,
+    "skip_create_srt_mod": false,
+    "role_list_format": "txt",
 };
 
 // load config
 config = Object.assign(config, preConfig);
-if(fs.existsSync(`./main.config.json`)){
-    let loadedConfig = require(`./main.config.json`);
+const configFile = __dirname + `/set_config.json`;
+if(fs.existsSync(configFile)){
+    let loadedConfig = require(configFile);
     config = Object.assign(config, loadedConfig);
 }
 
@@ -35,18 +48,26 @@ if(fs.existsSync(`./main.config.json`)){
 (async function(){
     console.log(`== Advanced SubStation Alpha to Dialogue List ==`);
     console.log(`==             by  Seiya Loveless             ==`);
-    const langRegx = /^set_([a-z]{2})$/;
-    let setLangFile = filterByRegx(fs.readdirSync('./language/'),langRegx);
-    setLangFile = setLangFile.length > 0 ? setLangFile[0].match(langRegx)[1] : 'en';
-    if(fs.existsSync(`./language/${setLangFile}.json`)){
-        lang = require(`./language/${setLangFile}.json`);
+    // set lang
+    let langCode        = 'ru.json';
+    const langFilesPath = __dirname + `/language/`;
+    if(typeof config.language == 'string' && config.language.match(/^[a-z]{2}$/)){
+        config.language += '.json';
+        const langFiles = fs.readdirSync(langFilesPath);
+        langCode = langFiles.includes(config.language) ? config.language : 'ru.json';
+    }
+    const langFile = langFilesPath + langCode;
+    if(fs.existsSync(langFile)){
+        lang = require(langFile);
     }
     else{
         console.error(`[ERROR] Language file not found!`);
+        await doPause();
         process.exit();
     }
-    if(fs.existsSync(`./roles.json`)){
-        roles = require(`./roles.json`);
+    const setRolesFile = __dirname + `/set_roles.json`;
+    if(fs.existsSync(setRolesFile)){
+        roles = require(setRolesFile);
     }
     if(roles.toString() != '[object Object]'){
         roles = {};
@@ -58,15 +79,28 @@ if(fs.existsSync(`./main.config.json`)){
         roles.female = [];
     }
     require('process').chdir(`${__dirname}/subtitles/`);
-    let fls = filterByRegx(fs.readdirSync('.'),/(?<!\.Dub)\.ass$/);
+    const subsDir = fs.readdirSync(process.cwd())
+    let fls = filterByRegx(subsDir,/(?<!\.Dub)\.ass$/);
+    if(fls.length<1){
+        console.log(`[ERROR] No input files!`);
+        await doPause();
+        process.exit();
+    }
     for(let f of fls){
         file = f;
         if(fs.existsSync(file)){
             console.log(`[INFO] Processing ${file}...`);
-            await parseFile();
+            try{
+                await parseFile();
+            }
+            catch(e){
+                console.log(e);
+            }
             console.log(`[INFO] Done!`);
         }
     }
+    await doPause();
+    process.exit();
 }());
 
 function filterByRegx(arr,regx) {
@@ -142,7 +176,7 @@ async function parseFile(){
                 let type = s.split(':')[0];
                 let parm = s.replace(new RegExp(`^${type}: `),'');
                 if(type == 'Format'){
-                    ass.styles.format = parm.split(', ');
+                    ass.styles.format = parm.split(',').map(p=>p.trim())
                     continue;
                 }
                 else{
@@ -159,7 +193,7 @@ async function parseFile(){
                 let parm = s.replace(new RegExp(`^${type}: `),'');
                 let ptxt = '', ctxt = '';
                 if(type == 'Format'){
-                    ass.events.format = parm.split(', ');
+                    ass.events.format = parm.split(',').map(p=>p.trim())
                     continue;
                 }
                 else{
@@ -174,6 +208,12 @@ async function parseFile(){
                     let cprm = parm.slice(0, 9);
                     let current = Object.assign(...ass.events.format.map((k, i) => ({[k]: parm[i]})));
                     current = Object.assign({CleanText: ctxt}, current);
+                    if(typeof current.Name != 'string'){
+                        current.Name = '';
+                    }
+                    if(current.Name == '' && typeof current.Actor == 'string'){
+                        current.Name = current.Actor;
+                    }
                     let roleNames = current.Name.replace(/\t/g,' ').replace(/  +/g,' ')
                                         .replace(/;;+/g,';').replace(/^;+/g,'').replace(/;+$/g,'');
                     roleNames = roleNames.split(';').map(r => r.trim());
@@ -202,15 +242,10 @@ async function parseFile(){
     }
     if(ass.script_info.ScriptType != 'v4.00+'){
         console.log(`[WARN] Supported only script types v4.00+!`);
-        process.exit();
+        return;
     }
     else{
-        // make files
-        let assFile = '';
-        let srtFile = '';
-        let docFile = new Document();
-        let docRole = new Document();
-        let txtRole = '';
+        // base fn
         let fileName = path.join(file.replace(/(\\|\/)+$/g,'').replace(/\.ass$/,''));
         // make role list
         let sroles = {
@@ -231,6 +266,8 @@ async function parseFile(){
                 sroles.unsorted.push(`${role}\t${ass.roles[role]}`);
             }
         }
+        // txt roles
+        let txtRole = '';
         txtRole = [].concat(
             [`${lang.male}`],[''],sroles.male,[''],
             [`${lang.female}`],[''],sroles.female,[''],
@@ -240,41 +277,51 @@ async function parseFile(){
                 [`${lang.unsorted}`],[''],sroles.unsorted,[''],
             );
         }
-        fs.writeFileSync(`${fileName}.Roles.txt`, txtRole.join(`\r\n`));
-        fs.writeFileSync(`${fileName}.Roles.csv`, `\ufeff`+txtRole.join(`\r\n`).replace(/\t/g,';'));
         // role list docx
         txtRole.unshift(`${lang.character}\t${lang.dialogues}`,'');
-        let rows = Object.keys(txtRole).length;
-        let roleTable = new Table({
-            rows: rows,
-            columns: 2,
-            width: 100,
-            widthUnitType: 'pct',
-            margins: { left: '0.2cm', right: '0.2cm', },
-            float: { relativeHorizontalPosition: 'center', },
-        });
+        // docx roles
+        let docRoleCont = '';
+        let docRole = new Document();
+        let rolesRows = [];
         for(let r in txtRole){
             roleStr = txtRole[r];
             roleStr = roleStr.split(`\t`);
             roleStr[1] = !roleStr[1] ? '' : roleStr[1];
-            roleTable.getCell(r, 0).Properties.setWidth('50%');
-            roleTable.getCell(r, 1).Properties.setWidth('50%');
-            roleTable.getCell(r, 0).addParagraph(new Paragraph(roleStr[0]));
-            roleTable.getCell(r, 1).addParagraph(new Paragraph(roleStr[1]));
+            let rolesRow = new TableRow({
+                children: [
+                    addTableCell(roleStr[0], '50%'),
+                    addTableCell(roleStr[1], '50%'),
+                ],
+            });
+            rolesRows.push(rolesRow);
         }
-        docRole.addTable(roleTable);
-        let docRoleCont = await new Packer().toBuffer(docRole);
-        try{
-            fs.writeFileSync(`${fileName}.Roles.docx`, docRoleCont);
-        }
-        catch(e){
-            console.log(e);
-            console.log(`[ERROR] File ${fileName}.Roles.docx not saved!`);
+        docRole.addSection({children:[
+            addTable(rolesRows)
+        ]});
+        docRoleCont = await Packer.toBuffer(docRole);
+        // save role list
+        switch(config.role_list_format){
+            case 'docx':
+                try{
+                    fs.writeFileSync(`${fileName}.Roles.docx`, docRoleCont);
+                }
+                catch(e){
+                    console.log(e);
+                    console.log(`[ERROR] File ${fileName}.Roles.docx not saved!`);
+                }
+                break;
+            case 'csv':
+                fs.writeFileSync(`${fileName}.Roles.csv`, `\ufeff`+txtRole.join(`\r\n`).replace(/\t/g,';'));
+                break;
+            case 'txt':
+            default:
+                fs.writeFileSync(`${fileName}.Roles.txt`, `\ufeff`+txtRole.join(`\r\n`)); 
         }
         // make new ass, srt and docx
+        let assFile = '';
         assFile = [
             `[Script Info]`,
-            `Title: ${ass.script_info.Title}`,
+            `Title: ${ass.script_info.Title?ass.script_info.Title:''}`,
             `Original Translation: `,
             `Original Editing: `,
             `Original Timing: `,
@@ -283,10 +330,10 @@ async function parseFile(){
             `Update Details: `,
             `ScriptType: v4.00+`,
             `Collisions: Normal`,
-            `PlayResX: ${ass.script_info.PlayResX}`,
-            `PlayResY: ${ass.script_info.PlayResY}`,
+            (ass.script_info.PlayResX?`PlayResX: ${ass.script_info.PlayResX}`:''),
+            (ass.script_info.PlayResY?`PlayResX: ${ass.script_info.PlayResY}`:''),
             `Timer: 0.0000`,
-            `WrapStyle: ${ass.script_info.WrapStyle}`,
+            (ass.script_info.WrapStyle?`PlayResX: ${ass.script_info.WrapStyle}`:''),
             `\r\n`,
         ].join(`\r\n`);
         // restore styles
@@ -301,6 +348,7 @@ async function parseFile(){
         let assFileEvents = [`[Events]`];
         assFileEvents.push(`Format: ${ass.events.format.join(', ')}`);
         // prep doc table
+        let srtFile = '';
         let docArr = [],
             subtitle_dlg_id = -1,
             current_row = -1,
@@ -326,7 +374,6 @@ async function parseFile(){
             }
             let actor = dlgc.Name;
             let cleanDialogDocx = dlgc.CleanText.replace(/\\n/gi,' ').replace(/  +/g,' ').trim();
-            let cleanPrevDlDocx = dlgp ? dlgp.CleanText.replace(/\\n/gi,' ').replace(/  +/g,' ').trim() : '';
             if(actor == ''){
                 current_actor = undefined;
             }
@@ -342,14 +389,32 @@ async function parseFile(){
                 current_row++;
             }
             else{
-                let startStrMatch = /^\(\d{1,2}(-|:)\d{2}\) |^\d{1,2}(-|:)\d{2} /;
-                if(cleanPrevDlDocx.slice(-2) == '//' || assTimeToDoc(dlgc.Start, dlgp.End) == 5 && cleanPrevDlDocx.slice(-1) != '/' ){
-                    if(cleanDialogDocx.match(startStrMatch)){ // cleanPrevDlDocx.slice(-2) == '//' &&
-                        cleanDialogDocx = cleanDialogDocx.replace(startStrMatch,'');
+                let cleanPrevDlDocx = docArr[current_row].text;
+                let stringTimeMatch = `(?:\\()\\d{1,2}(-|:)\\d{2}(?:\\))`;
+                let strStartReplace  = new RegExp(`^(|\\/+)(| +)${stringTimeMatch}`);
+                let strEndReplace    = new RegExp(`(\\/+)(| +)${stringTimeMatch}$`);
+                if(cleanPrevDlDocx.slice(-2) == '//'
+                    || cleanDialogDocx.slice(0, 2) == '//'
+                    || cleanDialogDocx.match(strStartReplace)
+                    || cleanPrevDlDocx.match(strEndReplace)
+                    || assTimeToDoc(dlgc.Start, dlgp.End) == 5 && cleanPrevDlDocx.slice(-1) != '/'
+                ){
+                    if(cleanDialogDocx.match(strStartReplace)){
+                        cleanDialogDocx = cleanDialogDocx.replace(strStartReplace,'').trim();
                     }
-                    docArr[current_row].text += ( cleanPrevDlDocx.slice(-2) != '//' ? ' //' : '' ) + assTimeToDoc(dlgc.Start);
+                    if(cleanPrevDlDocx.match(strEndReplace)){
+                        cleanPrevDlDocx = cleanPrevDlDocx.replace(strEndReplace,'').trim();
+                    }
+                    if(cleanPrevDlDocx.slice(-2) == '//'){
+                        cleanPrevDlDocx = cleanPrevDlDocx.replace(/\/+$/,'').trim();
+                    }
+                    docArr[current_row].text = cleanPrevDlDocx
+                        + (config.use_docx_string_splitter ? docxStringSplitter : ' ')
+                        + '//' + assTimeToDoc(dlgc.Start);
                 }
-                if(cleanPrevDlDocx.slice(-1) == '/'  || assTimeToDoc(dlgc.Start, dlgp.End) == 1 && cleanPrevDlDocx.slice(-1) != '/' ){
+                if(cleanPrevDlDocx.slice(-1) == '/'
+                    || assTimeToDoc(dlgc.Start, dlgp.End) == 1 && cleanPrevDlDocx.slice(-1) != '/'
+                ){
                     docArr[current_row].text += ( cleanPrevDlDocx.slice(-1) != '/' ? ' /' : '' );
                 }
                 docArr[current_row].text += ' ' + cleanDialogDocx;
@@ -357,39 +422,40 @@ async function parseFile(){
             }
         }
         // create doc
-        let dlgTable = new Table({
-            rows: docArr.length,
-            columns: (config.use_end_time ? 4 : 3),
-            width: 100,
-            widthUnitType: 'pct',
-            margins: { left: '0.2cm', right: '0.2cm', },
-            float: { relativeHorizontalPosition: 'center', },
-        });
+        let docFile = new Document();
+        let docFileCont = '';
+        let dialogRows = [];
+        let dialogCellWidths = calcCellWidths();
         for(let s in docArr){
             s = parseInt(s);
-            let str = docArr[s], 
-                table_seq = 0;
-            dlgTable.getCell(s, table_seq).Properties.setWidth('1.35cm');
-            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.time));
-            table_seq++;
-            if(config.use_end_time){
-                dlgTable.getCell(s, table_seq).Properties.setWidth('1.35cm');
-                dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.tend));
-                table_seq++;
+            let str = docArr[s];
+            let dialogCells = [];
+            if(config.use_start_time){
+                dialogCells.push(addTableCell(str.time, dialogCellWidths[0]));
             }
-            dlgTable.getCell(s, table_seq).Properties.setWidth('2.15cm');
-            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.actor));
-            table_seq++;
-            // dlgTable.getCell(s, table_seq).Properties.setWidth('50%');
-            dlgTable.getCell(s, table_seq).addParagraph(new Paragraph(str.text));
+            if(config.use_end_time){
+                dialogCells.push(addTableCell(str.tend, dialogCellWidths[1]));
+            }
+            dialogCells.push(addTableCell(str.actor, dialogCellWidths[2]));
+            dialogCells.push(addTableCell(str.text, dialogCellWidths[3]));
+            let dialogRow = new TableRow({
+                children: dialogCells,
+            });
+            dialogRows.push(dialogRow);
         }
-        docFile.addTable(dlgTable);
-        let docFileCont = await new Packer().toBuffer(docFile);
+        docFile.addSection({children:[
+            addTable(dialogRows)
+        ]});
+        docFileCont = await Packer.toBuffer(docFile);
         // save
         assFileEvents.push(`\r\n`);
         assFile += assFileEvents.join(`\r\n`);
-        fs.writeFileSync(`${fileName}.Dub.ass`, assFile);
-        fs.writeFileSync(`${fileName}.Dub.srt`, srtFile);
+        if(!config.skip_create_ass_mod){
+            fs.writeFileSync(`${fileName}.Dub.ass`, `\ufeff`+assFile);
+        }
+        if(!config.skip_create_srt_mod){
+            fs.writeFileSync(`${fileName}.Dub.srt`, `\ufeff`+srtFile);
+        }
         try{
             fs.writeFileSync(`${fileName}.Dub.docx`, docFileCont);
         }
@@ -397,12 +463,67 @@ async function parseFile(){
             console.log(e);
             console.log(`[ERROR] File ${fileName}.Dub.docx not saved!`);
         }
-        // fs.writeFileSync(`${fileName}.Dub.json`, JSON.stringify(ass,null,'    '));
+        if(config.save_debug_json){
+            fs.writeFileSync(`${fileName}.Dub.json`, JSON.stringify(ass,null,'    '));
+        }
     }
 }
 
+function addTableCell(content, size){
+    let cellContent = [];
+    content = content.split(docxStringSplitter);
+    for(let c of content){
+        cellContent.push(new Paragraph({ text: c }));
+    }
+    let cell = new TableCell({
+        children: cellContent,
+        verticalAlign: VerticalAlign.CENTER,
+        width: { size: size },
+    });
+    return cell;
+}
+
+function addTable(content){
+    let table = new Table({
+        rows: content,
+        width: { size: 100, type: WidthType.PERCENTAGE, },
+        margins: { left: '0.2cm', right: '0.2cm', },
+        layout: TableLayoutType.FIXED,
+        float: {
+            relativeHorizontalPosition: 'center',
+            overlap: 'never',
+        },
+    });
+    return table;
+}
+
+function calcCellWidths(){
+    let w = [ 0, 0, 3.00, 16.32];
+    if(config.use_start_time){
+        w[0] = getTimeCellWidth();
+        w[3] -= w[0];
+    }
+    if(config.use_end_time){
+        w[1] = getTimeCellWidth();
+        w[3] -= w[1];
+    }
+    w[3] -= w[2];
+    w = w.map(s => s + 'cm');
+    return w;
+}
+
+function getTimeCellWidth(){
+    if(config.use_full_time_format && !config.use_full_time_hide_msec){
+        return 2.20;
+    }
+    if(config.use_full_time_format){
+        return 1.70;
+    }
+    return 1.50;
+}
+
 function convTimeDoc(time){
-    return config.use_full_time_format 
+    return config.use_full_time_format
                 ? ( config.use_full_time_hide_msec ? assFullTimeToDoc(time) : assFullTimeWMSecToDoc(time) )
                 : assTimeToDoc(time);
 }
@@ -423,11 +544,11 @@ function assTimeToDoc(time, timePrev){
     if(!timePrev){
         time = strToTimeArr(time);
         time[2] = Math.round(time[2]);
-        if(time[2] > 60){
+        if(time[2] > 59){
             time[2] = 0;
             time[1]++;
         }
-        if(time[1] > 60){
+        if(time[1] > 59){
             time[1] = 0;
             time[0]++;
         }
@@ -440,13 +561,13 @@ function assTimeToDoc(time, timePrev){
     }
     else{
         let time1 = strToTimeArr(time);
-        time1 = time1[0]*60*60 + time1[1]*60 + time1[2];
+        time1 = time1[0] * 60 * 60 + time1[1] * 60 + time1[2];
         let time2 = strToTimeArr(timePrev);
-        time2 = time2[0]*60*60 + time2[1]*60 + time2[2];
-        if(time1 - time2 > 4.99){
+        time2 = time2[0] * 60 * 60 + time2[1] * 60 + time2[2];
+        if(time1 - time2 > config.docx_join_time_long - 0.001){
             return 5;
         }
-        if(time1 - time2 > 0.99){
+        if(time1 - time2 > config.docx_join_time_short - 0.001){
             return 1;
         }
         return 0;
@@ -459,4 +580,18 @@ function strToTimeArr(time){
     time[1] = parseInt(time[1]);
     time[2] = parseFloat(time[2]);
     return time;
+}
+
+async function doPause(){
+    console.log(`Press any key to continue...`);
+    process.stdin.setRawMode(true);
+    return new Promise(resolve => process.stdin.once('data', data => {
+        const byteArray = [...data];
+        if (byteArray.length > 0 && byteArray[0] === 3) {
+            console.log('^C');
+            process.exit(1);
+        }
+        process.stdin.setRawMode(false);
+        resolve();
+    }));
 }
