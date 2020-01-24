@@ -298,7 +298,6 @@ async function parseFile(){
         docRole.addSection({children:[
             addTable(rolesRows)
         ]});
-        docRole = fixEmptyParagraph(docRole);
         docRoleCont = await Packer.toBuffer(docRole);
         // save role list
         switch(config.role_list_format){
@@ -432,13 +431,13 @@ async function parseFile(){
             let str = docArr[s];
             let dialogCells = [];
             if(config.use_start_time){
-                dialogCells.push(addTableCell(str.time, dialogCellWidths[0] + 'cm'));
+                dialogCells.push(addTableCell(str.time, dialogCellWidths[0]));
             }
             if(config.use_end_time){
-                dialogCells.push(addTableCell(str.tend, dialogCellWidths[1] + 'cm'));
+                dialogCells.push(addTableCell(str.tend, dialogCellWidths[1]));
             }
-            dialogCells.push(addTableCell(str.actor, dialogCellWidths[2] + 'cm'));
-            dialogCells.push(addTableCell(str.text, dialogCellWidths[3] + 'cm'));
+            dialogCells.push(addTableCell(str.actor, dialogCellWidths[2]));
+            dialogCells.push(addTableCell(str.text, dialogCellWidths[3]));
             let dialogRow = new TableRow({
                 children: dialogCells,
             });
@@ -447,7 +446,6 @@ async function parseFile(){
         docFile.addSection({children:[
             addTable(dialogRows)
         ]});
-        docFile = fixEmptyParagraph(docFile);
         docFileCont = await Packer.toBuffer(docFile);
         // save
         assFileEvents.push(`\r\n`);
@@ -465,21 +463,10 @@ async function parseFile(){
             console.log(e);
             console.log(`[ERROR] File ${fileName}.Dub.docx not saved!`);
         }
-        // fs.writeFileSync(`${fileName}.Dub.json`, JSON.stringify(ass,null,'    '));
+        if(config.save_debug_json){
+            fs.writeFileSync(`${fileName}.Dub.json`, JSON.stringify(ass,null,'    '));
+        }
     }
-}
-
-function fixEmptyParagraph(doc){
-    // Should fix empty paragraph bug
-    let sections = doc.document.body.root.length;
-    if(
-        sections > 0 &&
-        doc.document.body.root[0].rootKey == 'w:p' &&
-        doc.document.body.root[0].properties.root.length == 0
-    ){
-        doc.document.body.root[0].deleted = true;
-    }
-    return doc;
 }
 
 function addTableCell(content, size){
@@ -493,7 +480,6 @@ function addTableCell(content, size){
         verticalAlign: VerticalAlign.CENTER,
         width: { size: size },
     });
-    cell.properties.setWidth(size);
     return cell;
 }
 
@@ -503,7 +489,10 @@ function addTable(content){
         width: { size: 100, type: WidthType.PERCENTAGE, },
         margins: { left: '0.2cm', right: '0.2cm', },
         layout: TableLayoutType.FIXED,
-        float: { relativeHorizontalPosition: 'center', },
+        float: {
+            relativeHorizontalPosition: 'center',
+            overlap: 'never',
+        },
     });
     return table;
 }
@@ -519,6 +508,7 @@ function calcCellWidths(){
         w[3] -= w[1];
     }
     w[3] -= w[2];
+    w = w.map(s => s + 'cm');
     return w;
 }
 
